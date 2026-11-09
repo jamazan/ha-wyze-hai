@@ -3,6 +3,8 @@
 import base64
 import json
 import asyncio
+import ipaddress
+import socket
 from dataclasses import asdict
 from collections.abc import Callable
 from typing import Any
@@ -54,6 +56,21 @@ SNAPSHOT_TIMEOUT = 8
 SNAPSHOT_CACHE_TTL = 10
 SNAPSHOT_FAILURE_BACKOFF = 30
 WYZE_RECIPIENT_CLIENT_ID = "ada06f08-87f4-4e13-b699-e82db8517ae5"
+MDNS_RESOLVE_TIMEOUT = 2.0
+MDNS_CACHE_TTL = 300
+MDNS_CACHE_MAX = 256
+
+# Safari/WebKit clients (including the Home Assistant Mac app) hide their LAN
+# address behind a per-candidate "<uuid>.local" mDNS name.  Home Assistant can
+# resolve those names; the Wyze camera cannot, so the candidate is dropped on
+# the camera side and no media flows.  This matches the connection-address
+# field of an ICE candidate line, in a trickled candidate or inside an SDP.
+_MDNS_CANDIDATE_RE = re.compile(
+    r"(candidate:\S+\s+\d+\s+\S+\s+\d+\s+)([^\s]+\.local\.?)(\s+\d+\s+typ\s)",
+    re.IGNORECASE,
+)
+# name -> (expires_at, resolved address or None)
+_MDNS_CACHE: dict[str, tuple[float, str | None]] = {}
 
 
 def _ice_candidate_type(candidate: str | None) -> str:
@@ -62,6 +79,67 @@ def _ice_candidate_type(candidate: str | None) -> str:
         return "none"
     match = re.search(r"\btyp\s+(host|srflx|prflx|relay)\b", candidate)
     return match.group(1) if match else "unknown"
+
+
+def _pick_lan_address(addresses: list[str]) -> str | None:
+    """Pick the best address for a resolved mDNS name: IPv4 first, then global IPv6."""
+    v4: list[str] = []
+    v6: list[str] = []
+    for raw in addresses:
+        try:
+            ip = ipaddress.ip_address(raw.split("%", 1)[0])
+        except ValueError:
+            continue
+        if ip.is_unspecified or ip.is_loopback or ip.is_multicast:
+            continue
+        if ip.version == 4:
+            if not ip.is_link_local:
+                v4.append(str(ip))
+        elif not ip.is_link_local:
+            v6.append(str(ip))
+    return (v4 or v6 or [None])[0]
+
+
+async def _async_resolve_mdns(hass: HomeAssistant, name: str) -> str | None:
+    """Resolve a ".local" name from Home Assistant, caching the result briefly."""
+    now = time.monotonic()
+    cached = _MDNS_CACHE.get(name)
+    if cached is not None and cached[0] > now:
+        return cached[1]
+    address: str | None = None
+    try:
+        infos = await asyncio.wait_for(
+            hass.loop.getaddrinfo(name.rstrip("."), None, type=socket.SOCK_DGRAM),
+            timeout=MDNS_RESOLVE_TIMEOUT,
+        )
+        address = _pick_lan_address([info[4][0] for info in infos])
+    except (OSError, asyncio.TimeoutError):
+        address = None
+    if len(_MDNS_CACHE) >= MDNS_CACHE_MAX:
+        _MDNS_CACHE.clear()
+    _MDNS_CACHE[name] = (now + MDNS_CACHE_TTL, address)
+    return address
+
+
+async def _async_resolve_mdns_candidates(hass: HomeAssistant, text: str) -> str:
+    """Replace mDNS (".local") ICE candidate addresses in a candidate or SDP.
+
+    Names that cannot be resolved are left untouched, so behaviour for every
+    other client is unchanged.  Addresses are never logged.
+    """
+    names = {match.group(2) for match in _MDNS_CANDIDATE_RE.finditer(text)}
+    if not names:
+        return text
+    resolved = {name: await _async_resolve_mdns(hass, name) for name in names}
+    _LOGGER.debug(
+        "Resolved %d/%d mDNS ICE candidate hostnames",
+        sum(1 for address in resolved.values() if address),
+        len(resolved),
+    )
+    return _MDNS_CANDIDATE_RE.sub(
+        lambda m: m.group(1) + (resolved.get(m.group(2)) or m.group(2)) + m.group(3),
+        text,
+    )
 
 
 def _sdp_summary(sdp: str) -> str:
@@ -670,6 +748,9 @@ class WyzeCameraWebRTCSession:
         if self.websocket is None:
             raise ConnectionError("WebSocket connection not established")
         # Create an offer for Kinesis
+        # Safari-engine clients put ".local" mDNS names in the offer; the camera
+        # cannot resolve them, so swap in the real LAN address first.
+        offer_sdp = await _async_resolve_mdns_candidates(self.camera.hass, offer_sdp)
         self.sdp_offer = offer_sdp
         offer = {"type": "offer", "sdp": offer_sdp}
         payload = {
@@ -712,6 +793,9 @@ class WyzeCameraWebRTCSession:
             "sdpMLineIndex": candidate_dict["sdp_m_line_index"],
             "usernameFragment": candidate_dict["user_fragment"],
         }
+        candidate_payload["candidate"] = await _async_resolve_mdns_candidates(
+            self.camera.hass, candidate_payload["candidate"]
+        )
         match = re.search(r"ufrag (\w{4})", candidate_payload["candidate"])
         if match is not None:
             candidate_payload["usernameFragment"] = match.group(1)

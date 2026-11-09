@@ -16,4 +16,6 @@ The manifest installs it from the jamazan/wyzeapy v0.8.1.post1 release wheel, pi
 Local hardening: snapshot URLs must be https; TURN credentials no longer written to debug logs;
 per-stream WebRTC "connected" log lowered from WARNING to INFO.
 
+Safari-engine clients (Home Assistant Mac app, iOS, Safari) hide their LAN address behind `<uuid>.local` mDNS ICE candidates, which the camera cannot resolve, so no stream started. The relay now resolves `.local` candidate addresses from HA (IPv4 preferred, 2s timeout, 5 min cache) before forwarding them, both for trickled candidates and inside the SDP offer. Unresolvable names are forwarded unchanged. Covered by tests/test_camera_mdns_candidates.py; not yet run against a real camera.
+
 Not covered by tests: camera/WebRTC code, and none of the vacuum, scale or DX-lock code has run against real devices.
