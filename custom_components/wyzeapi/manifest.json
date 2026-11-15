@@ -1,16 +1,16 @@
 {
   "domain": "wyzeapi",
-  "name": "Wyze",
+  "name": "Wyze HAI",
   "codeowners": [
-    "@SecKatie"
+    "@jamazan"
   ],
   "config_flow": true,
   "dependencies": [
     "bluetooth_adapters"
   ],
-  "documentation": "https://github.com/SecKatie/ha-wyzeapi#readme",
+  "documentation": "https://github.com/jamazan/ha-wyze-hai#readme",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/jamazan/ha-wyzeapi/issues",
+  "issue_tracker": "https://github.com/jamazan/ha-wyze-hai/issues",
   "loggers": [
     "custom_components.wyzeapi"
   ],

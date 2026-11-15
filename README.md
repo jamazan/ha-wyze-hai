@@ -4,8 +4,13 @@ SPDX-FileCopyrightText: 2021 Katie Mulliken <katie@mulliken.net>
 SPDX-License-Identifier: Apache-2.0
 -->
 
-![Buy me a coffee](https://img.buymeacoffee.com/button-api/?emoji=&slug=seckatie&button_colour=BD5FFF&font_colour=ffffff&font_family=Cookie&outline_colour=000000&coffee_colour=FFDD00)
+# Wyze HAI
 
+A standalone Home Assistant integration for Wyze devices, maintained by [@jamazan](https://github.com/jamazan).
+It started from [SecKatie/ha-wyzeapi](https://github.com/SecKatie/ha-wyzeapi) (Apache-2.0, based on upstream
+v0.1.41) and is now developed independently, with a focus on reliable cameras and local recording. Full history and
+original copyright notices are preserved; see [FORK.md](FORK.md) for what was merged and changed. The integration
+domain is still `wyzeapi`.
 
 # Home Assistant - Wyze Integration
 

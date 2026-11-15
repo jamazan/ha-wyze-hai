@@ -1,4 +1,4 @@
-# jamazan fork of SecKatie/ha-wyzeapi
+# Provenance: derived from SecKatie/ha-wyzeapi
 
 Based on upstream v0.1.41 (Apache-2.0). Merged open upstream PRs:
 
