@@ -51,7 +51,7 @@ See [what changed in 0.1.40](RELEASE_NOTES.md) before updating.
 ## Installation (HACS) - Highly Recommended
 
 1. Have HACS installed, this will allow you to easily update
-2. Add [https://github.com/SecKatie/ha-wyzeapi](https://github.com/SecKatie/ha-wyzeapi) as a custom
+2. Add [https://github.com/jamazan/ha-wyze-hai](https://github.com/jamazan/ha-wyze-hai) as a custom
    repository as Type: Integration
 3. Click install under "Wyze Bulb and Switch Api Integration" in the Integration tab
 4. Restart HA
@@ -90,7 +90,6 @@ If you need help with anything then please connect with the community!
 * Visit us on IRC at librechat in the #wyzeapi channel!
 * Visit the discussions tab on this repo
 * For bugs or feature requests create an issue
-* Check out the [wiki](https://github.com/SecKatie/ha-wyzeapi/wiki)!
 
 ## Reporting an Issue
 
